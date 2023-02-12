@@ -1,8 +1,18 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
+import {
+	joinVoiceChannel,
+	createAudioPlayer,
+	createAudioResource,
+	entersState,
+	StreamType,
+	AudioPlayerStatus,
+	VoiceConnectionStatus,
+} from '@discordjs/voice';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as url from 'url';
+import createDiscordJSAdapter from './adapter.js';
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
@@ -10,7 +20,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildVoiceStates
+    GatewayIntentBits.GuildVoiceStates,
+		GatewayIntentBits.MessageContent
   ]
 });
 
@@ -30,8 +41,14 @@ for (const file of commandFiles) {
 	}
 }
 
-client.on('ready', () => {
+client.on('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
+	try {
+		await playSong();
+		console.log('Song is ready to play!');
+	} catch (error) {
+		console.error(error);
+	}
 })
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -49,6 +66,98 @@ client.on(Events.InteractionCreate, async interaction => {
 	} catch (error) {
 		console.error(error);
 		await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+	}
+});
+
+const player = createAudioPlayer();
+
+function playSong() {
+	const resource = createAudioResource(path.join(__dirname, 'monkey.mp3'), {
+		inputType: StreamType.Arbitrary,
+	});
+
+	/**
+	 * We will now play this to the audio player. By default, the audio player will not play until
+	 * at least one voice connection is subscribed to it, so it is fine to attach our resource to the
+	 * audio player this early.
+	 */
+	player.play(resource);
+
+	/**
+	 * Here we are using a helper function. It will resolve if the player enters the Playing
+	 * state within 5 seconds, otherwise it will reject with an error.
+	 */
+	return entersState(player, AudioPlayerStatus.Playing, 5000);
+}
+
+async function connectToChannel(channel) {
+	const connection = joinVoiceChannel({
+		channelId: channel.id,
+		guildId: channel.guild.id,
+		adapterCreator: createDiscordJSAdapter(channel),
+	});
+
+	try {
+		/**
+		 * Allow ourselves 30 seconds to join the voice channel. If we do not join within then,
+		 * an error is thrown.
+		 */
+		await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+		/**
+		 * At this point, the voice connection is ready within 30 seconds! This means we can
+		 * start playing audio in the voice channel. We return the connection so it can be
+		 * used by the caller.
+		 */
+		return connection;
+	} catch (error) {
+		/**
+		 * At this point, the voice connection has not entered the Ready state. We should make
+		 * sure to destroy it, and propagate the error by throwing it, so that the calling function
+		 * is aware that we failed to connect to the channel.
+		 */
+		connection.destroy();
+		throw error;
+	}
+}
+
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+	console.log('old: ',oldState);
+	console.log('new: ', newState);
+});
+
+client.on(Events.MessageCreate, async (message) => {
+	console.log(message)
+	if (!message.guildId) return;
+
+	if (message.content === '-join') {
+		const channel = message.member?.voice.channel;
+
+		if (channel) {
+			/**
+			 * The user is in a voice channel, try to connect.
+			 */
+			try {
+				const connection = await connectToChannel(channel);
+
+				/**
+				 * We have successfully connected! Now we can subscribe our connection to
+				 * the player. This means that the player will play audio in the user's
+				 * voice channel.
+				 */
+				connection.subscribe(player);
+				await message.reply('Playing now!');
+			} catch (error) {
+				/**
+				 * Unable to connect to the voice channel within 30 seconds :(
+				 */
+				console.error(error);
+			}
+		} else {
+			/**
+			 * The user is not in a voice channel.
+			 */
+			void message.reply('Join a voice channel then try again!');
+		}
 	}
 });
 
