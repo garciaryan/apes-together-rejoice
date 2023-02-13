@@ -45,7 +45,7 @@ client.on('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 	try {
 		await playSong();
-		console.log('Song is ready to play!');
+		console.log('Apes ready to rejoice!');
 	} catch (error) {
 		console.error(error);
 	}
@@ -71,8 +71,12 @@ client.on(Events.InteractionCreate, async interaction => {
 
 const player = createAudioPlayer();
 
+player.on('error', err => {
+	console.error('Error: ',err.message, 'with track', err.resource.metadata.title);
+})
+
 function playSong() {
-	const resource = createAudioResource(path.join(__dirname, 'monkey.mp3'), {
+	const resource = createAudioResource(path.join(__dirname, 'assets/audio/monkey.mp3'), {
 		inputType: StreamType.Arbitrary,
 	});
 
@@ -121,15 +125,14 @@ async function connectToChannel(channel) {
 }
 
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
-	console.log('old: ',oldState);
-	console.log('new: ', newState);
+	//console.log('old: ',oldState);
+	//console.log('new: ', newState);
 });
 
 client.on(Events.MessageCreate, async (message) => {
-	console.log(message)
 	if (!message.guildId) return;
 
-	if (message.content === '-join') {
+	if (message.content === '-rejoice') {
 		const channel = message.member?.voice.channel;
 
 		if (channel) {
@@ -144,8 +147,15 @@ client.on(Events.MessageCreate, async (message) => {
 				 * the player. This means that the player will play audio in the user's
 				 * voice channel.
 				 */
-				connection.subscribe(player);
-				await message.reply('Playing now!');
+				const subscription = connection.subscribe(player);
+				await message.reply(':gorilla: :gorilla: :gorilla:');
+				if (subscription) {
+					setTimeout(() => {
+						subscription.unsubscribe();
+						connection.destroy();
+					}, 5_000);
+				}
+
 			} catch (error) {
 				/**
 				 * Unable to connect to the voice channel within 30 seconds :(
