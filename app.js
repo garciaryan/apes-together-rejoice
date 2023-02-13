@@ -124,9 +124,29 @@ async function connectToChannel(channel) {
 	}
 }
 
-client.on(Events.VoiceStateUpdate, (oldState, newState) => {
-	//console.log('old: ',oldState);
-	//console.log('new: ', newState);
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+	if (oldState.member.user.bot) return;
+	if (oldState.channelId === null || typeof oldState.channelId == 'undefined') {
+		const channel = newState.member?.voice.channel;
+
+		if (channel) {
+			try {
+				const connection = await connectToChannel(channel);
+				const subscription = connection.subscribe(player);
+				
+				if (subscription) {
+					setTimeout(() => {
+						subscription.unsubscribe();
+						connection.destroy();
+					}, 5_000);
+				}
+			} catch (err) {
+				console.error(err)
+			}
+		} else {
+			console.log('no voice channel detected');
+		}
+	}
 });
 
 client.on(Events.MessageCreate, async (message) => {
