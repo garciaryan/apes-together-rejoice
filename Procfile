@@ -1,1 +1,1 @@
-worker: node app.js
+worker: sh -c 'node deploy-commands.js && node app.js'
