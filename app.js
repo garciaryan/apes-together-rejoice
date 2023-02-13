@@ -13,6 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as url from 'url';
 import createDiscordJSAdapter from './adapter.js';
+import express from 'express';
+
+const app = express();
+app.listen(process.env.PORT);
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
@@ -133,7 +137,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 			try {
 				const connection = await connectToChannel(channel);
 				const subscription = connection.subscribe(player);
-				
+
 				if (subscription) {
 					setTimeout(() => {
 						subscription.unsubscribe();
