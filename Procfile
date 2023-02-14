@@ -1,1 +1,1 @@
-worker: sh -c 'node deploy-commands.js && node app.js'
+web: sh -c 'node deploy-commands.js && node app.js'
