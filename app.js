@@ -8,15 +8,17 @@ import {
 	StreamType,
 	AudioPlayerStatus,
 	VoiceConnectionStatus,
+	NoSubscriberBehavior,
 } from '@discordjs/voice';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as url from 'url';
 import createDiscordJSAdapter from './adapter.js';
 import express from 'express';
+const port = process.env.PORT || 3005;
 
 const app = express();
-app.listen(process.env.PORT);
+app.listen(port, () => console.log(`App listening on port ${port}`));
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
@@ -53,7 +55,7 @@ client.on('ready', async () => {
 	} catch (error) {
 		console.error(error);
 	}
-})
+});
 
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
@@ -73,7 +75,11 @@ client.on(Events.InteractionCreate, async interaction => {
 	}
 });
 
-const player = createAudioPlayer();
+const player = createAudioPlayer({
+	behaviors: {
+		noSubscriber: NoSubscriberBehavior.Stop
+	}
+});
 
 player.on('error', err => {
 	console.error('Error: ',err.message, 'with track', err.resource.metadata.title);
@@ -145,7 +151,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 					}, 5_000);
 				}
 			} catch (err) {
-				console.error(err)
+				console.error(err);
 			}
 		} else {
 			console.log('no voice channel detected');
