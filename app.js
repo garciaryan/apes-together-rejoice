@@ -18,7 +18,7 @@ import express from 'express';
 const port = process.env.PORT || 3005;
 
 const app = express();
-app.listen(port, () => console.log(`App listening on port ${port}`));
+app.listen(port, '0.0.0.0');
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
